@@ -451,10 +451,10 @@
         html += `<div class="message">
                     <img src="${msg.profile_picture}" alt="icon" />
                     <strong style="margin-right: 8px;">${msg.display_name}:</strong> ${parsedContent}`;
-        if (msg.user_id === currentUserId) {
+        /*if (msg.user_id === currentUserId) {
           html += `<button style="margin-left: 8px;" onclick="editMessage(${msg.id}, '${msg.content.replace(/'/g, "\\'")}')">Edit</button>
                    <button style="margin-left: 4px;" onclick="deleteMessage(${msg.id})">Delete</button>`;
-        }
+        }*/
         html += `</div>`;
       }
       document.getElementById('chat-box').innerHTML += html;
