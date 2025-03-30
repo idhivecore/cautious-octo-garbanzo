@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retro Chat</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #ddd;
+      font-family: 'Courier New', monospace;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+    }
+    .container {
+      display: flex;
+      width: 100%;
+    }
+    /* Sidebar styles for servers, channels, online members, profile & alternates */
+    .sidebar {
+      width: 250px;
+      background-color: #1f1f1f;
+      padding: 10px;
+      color: #eee;
+      border-right: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .sidebar h3 {
+      text-align: center;
+      color: #ddd;
+    }
+    .sidebar p, .sidebar button {
+      padding: 8px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      text-align: left;
+      color: #eee;
+    }
+    .sidebar p:hover, .sidebar button:hover {
+      background-color: #333;
+    }
+    .sidebar input {
+      width: 90%;
+      margin: 5px;
+      padding: 5px;
+    }
+    .main-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chat-area {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chat-box {
+      flex-grow: 1;
+      padding: 10px;
+      background-color: #1a1a1a;
+      overflow-y: auto;
+    }
+    .message-input-area {
+      padding: 10px;
+      background-color: #1a1a1a;
+      border-top: 1px solid #444;
+      display: flex;
+      flex-direction: column;
+    }
+    #message {
+      width: 100%;
+      padding: 10px;
+      background-color: #333;
+      color: #ddd;
+      border: 1px solid #444;
+      resize: none;
+      box-sizing: border-box;
+      margin-bottom: 5px;
+    }
+    button {
+      background-color: #333;
+      color: #ddd;
+      border: 1px solid #444;
+      padding: 8px;
+      margin: 5px 0;
+    }
+    .message {
+      padding: 5px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+    }
+    .message img {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .login-form, .register-form {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .form-section {
+      margin: 10px 0;
+      border-top: 1px solid #444;
+      padding-top: 10px;
+    }
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background-color: #444;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background-color: #333;
+    }
+    /* Alternate selection styling */
+    .alternate-item {
+      padding: 5px;
+      border: 1px solid #444;
+      margin: 3px 0;
+      cursor: pointer;
+    }
+    .alternate-item.selected {
+      background-color: #555;
+    }
+  </style>
+  <!-- Include Marked library for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar" style="display: none;">
+      <h3>Servers</h3>
+      <div id="servers"></div>
+      <input type="text" id="new-server-name" placeholder="New server name" />
+      <button onclick="createServer()">Create Server</button>
+
+      <h3>Channels</h3>
+      <div id="channels"></div>
+      <input type="text" id="new-channel-name" placeholder="New channel name" />
+      <button onclick="createChannel()">Create Channel</button>
+
+      <h3>Online Members</h3>
+      <div id="online-members"></div>
+
+      <div class="form-section">
+        <h3>My Profile</h3>
+        <p id="profile-info"></p>
+        <input type="text" id="update-username" placeholder="New Username" />
+        <input type="text" id="update-display-name" placeholder="New Display Name" />
+        <button onclick="updateProfile()">Update Profile</button>
+        <br/>
+        <!-- Replace file input with URL input -->
+        <input type="text" id="profile-icon-url" placeholder="Profile Icon URL" />
+        <button onclick="updateProfileIcon()">Update Icon</button>
+      </div>
+
+      <div class="form-section">
+        <h3>My Alternates</h3>
+        <div id="alternates-list"></div>
+        <input type="text" id="new-alternate-name" placeholder="Alternate Name" />
+        <input type="text" id="new-alternate-icon" placeholder="Alternate Icon URL" />
+        <button onclick="createAlternate()">Create Alternate</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div id="auth-container">
+        <div class="login-form">
+          <h2>Login</h2>
+          <input type="text" id="login-username" placeholder="Username" />
+          <input type="password" id="login-password" placeholder="Password" />
+          <button onclick="login()">Login</button>
+          <a href="#" onclick="showRegisterForm()">Need an account? Register here.</a>
+        </div>
+
+        <div class="register-form" style="display: none;">
+          <h2>Register</h2>
+          <input type="text" id="register-username" placeholder="Username" />
+          <input type="password" id="register-password" placeholder="Password" />
+          <input type="text" id="register-display-name" placeholder="Display Name" />
+          <button onclick="register()">Register</button>
+          <a href="#" onclick="showLoginForm()">Already have an account? Login here.</a>
+        </div>
+      </div>
+
+      <!-- Chat Area -->
+      <div class="chat-area" id="chat-area" style="display: none;">
+        <div class="chat-box" id="chat-box"></div>
+        <div class="message-input-area">
+            <!-- Alternate selection dropdown (populated dynamically) -->
+            <select id="alternate-selector" onchange="selectAlternate(this.value)">
+                <option value="">Default (Your Profile)</option>
+            </select>
+            <textarea id="message" placeholder="Type a message (Markdown supported)" onkeydown="if(event.key === 'Enter' && !event.shiftKey){event.preventDefault(); sendMessage();}" rows="3"></textarea>
+            
+            <!-- Add a checkbox for "is_action" -->
+            <label>
+                <input type="checkbox" id="is-action-checkbox" />
+                Send as action
+            </label>
+            
+            <button onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const apiBase = 'http://10.0.0.8:8000';
+    let currentServer = null;
+    let currentChannel = null;
+    let currentUserId = null;
+    let currentUsername = null;
+    let currentDisplayName = '';
+    let currentProfilePicture = '';
+    let currentAlternates = []; // Will store alternate objects from the backend
+    let selectedAlternate = null;
+    let token = localStorage.getItem('token') || null;
+    let loggedIn = false;
+    let ws = null; // Global websocket variable
+
+    let currentAlert = null;
+    function create_alert(input) {
+      currentAlert = input;
+    }
+
+    // Show login form
+    function showLoginForm() {
+      if(localStorage.getItem('token') == null){
+        document.querySelector('.login-form').style.display = 'flex';
+        document.querySelector('.register-form').style.display = 'none';
+      } else {
+        token = localStorage.getItem('token');
+        fetch(apiBase + '/get-self', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'  },
+          body: JSON.stringify({ token })
+        })
+        .then(response => response.json())
+        .then(data => {
+          currentUserId = data.id;
+          currentUsername = data.username;
+          currentDisplayName = data.display_name;
+          currentProfilePicture = data.profile_picture || 'hidden.png';
+          updateProfileInfo();
+          loadServers();
+          loadOnlineMembers();
+          loadAlternates();
+          loadAlternateSelector();
+          showChat();
+        });
+      }
+    }
+
+    // Show register form
+    function showRegisterForm() {
+      document.querySelector('.register-form').style.display = 'flex';
+      document.querySelector('.login-form').style.display = 'none';
+    }
+
+    // Register user
+    function register() {
+      let username = document.getElementById('register-username').value;
+      let password = document.getElementById('register-password').value;
+      let display_name = document.getElementById('register-display-name').value;
+      if (!username || !password || !display_name) {
+        create_alert('Please fill in all registration fields.');
+        return;
+      }
+      fetch(apiBase + '/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'  },
+        body: JSON.stringify({ username, password, display_name })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.message) {
+          create_alert(data.message);
+          // Auto login after registration
+          document.getElementById('login-username').value = username;
+          document.getElementById('login-password').value = password;
+          showLoginForm();
+          login();
+        } else {
+          create_alert('Registration failed.');
+        }
+      });
+    }
+
+    // Log in user
+    function login() {
+      let username = document.getElementById('login-username').value;
+      let password = document.getElementById('login-password').value;
+      if (!username || !password) {
+        create_alert('Please provide a username and password.');
+        return;
+      }
+      fetch(apiBase + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'  },
+        body: JSON.stringify({ username, password, display_name: '' })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.message === 'Logged in') {
+          loggedIn = true;
+          token = data.token;
+          localStorage.setItem('token', token);
+          fetch(apiBase + '/get-self', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'  },
+            body: JSON.stringify({ token })
+          })
+          .then(response => response.json())
+          .then(data => {
+            currentUserId = data.id;
+            currentUsername = data.username;
+            currentDisplayName = data.display_name;
+            currentProfilePicture = data.profile_picture || 'hidden.png';
+            updateProfileInfo();
+            loadServers();
+            loadOnlineMembers();
+            loadAlternates();
+            loadAlternateSelector();
+            showChat();
+          });
+        } else {
+          create_alert('Login failed: ' + data.detail);
+        }
+      });
+    }
+
+    // Show chat area
+    function showChat() {
+      document.getElementById('auth-container').style.display = 'none';
+      document.getElementById('chat-area').style.display = 'flex';
+      document.getElementById('sidebar').style.display = 'flex';
+    }
+
+    // Update profile info in sidebar
+    function updateProfileInfo() {
+      document.getElementById('profile-info').innerText = `${currentDisplayName}`;
+    }
+
+    // Load server list
+    function loadServers() {
+      fetch(apiBase + '/servers', {headers: { 'ngrok-skip-browser-warning': 'true' }})
+        .then(res => res.json())
+        .then(servers => {
+          let html = '';
+          servers.forEach(server => {
+            html += `<p onclick="loadChannels(${server.id})">${server.name}</p>`;
+          });
+          document.getElementById('servers').innerHTML = html;
+        });
+    }
+
+    // Create new server
+    function createServer() {
+      let name = document.getElementById('new-server-name').value;
+      if (!name) {
+        create_alert('Please enter a server name.');
+        return;
+      }
+      fetch(apiBase + '/create-server', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'  },
+        body: JSON.stringify({ name })
+      })
+      .then(res => res.json())
+      .then(data => {
+        create_alert(data.message);
+        loadServers();
+      });
+    }
+
+    // Load channels for selected server
+    function loadChannels(serverId) {
+      currentServer = serverId;
+      fetch(apiBase + `/channels?server_id=${serverId}`, {headers: { 'ngrok-skip-browser-warning': 'true' }})
+        .then(res => res.json())
+        .then(channels => {
+          let html = '';
+          channels.forEach(channel => {
+            html += `<p onclick="joinChannel(${channel.id})">${channel.name}</p>`;
+          });
+          document.getElementById('channels').innerHTML = html;
+        });
+    }
+
+    // Open a WebSocket connection for the selected channel
+    function joinChannel(channelId) {
+      currentChannel = channelId;
+      fetch(apiBase + `/messages?channel_id=${channelId}`, {headers: { 'ngrok-skip-browser-warning': 'true' }})
+        .then(res => res.json())
+        .then(data => {
+            for (let i = 0; i < data.messages.length; i++) {
+                appendMessage(data.messages[i]);
+            }
+        });
+      // If a WebSocket connection already exists, close it
+      if (ws) {
+        ws.close();
+      }
+      // Convert API base to WebSocket URL (http -> ws, https -> wss)
+      let wsProtocol = apiBase.startsWith('https') ? 'wss://' : 'ws://';
+      let stripped = apiBase.replace(/^https?:\/\//, '');
+      let wsUrl = wsProtocol + stripped + '/ws/' + channelId;
+      ws = new WebSocket(wsUrl);
+      
+      ws.onopen = function() {
+        console.log('WebSocket connected to channel ' + channelId);
+      };
+      
+      ws.onmessage = function(event) {
+        const msg = JSON.parse(event.data);
+        appendMessage(msg);
+      };
+      
+      ws.onclose = function() {
+        console.log('WebSocket disconnected.');
+      };
+      
+      // Clear previous chat messages
+      document.getElementById('chat-box').innerHTML = '';
+    }
+
+    // Append a received message to the chat box
+    function appendMessage(msg) {
+      let html = '';
+      const parsedContent = marked.parseInline(msg.content);
+      if (msg.is_action) {
+        html += `<div class="message">
+                    <img src="${msg.profile_picture}" alt="icon" />
+                    <i>${parsedContent}</i>
+                  </div>`;
+      } else {
+        html += `<div class="message">
+                    <img src="${msg.profile_picture}" alt="icon" />
+                    <strong style="margin-right: 8px;">${msg.display_name}:</strong> ${parsedContent}`;
+        if (msg.user_id === currentUserId) {
+          html += `<button style="margin-left: 8px;" onclick="editMessage(${msg.id}, '${msg.content.replace(/'/g, "\\'")}')">Edit</button>
+                   <button style="margin-left: 4px;" onclick="deleteMessage(${msg.id})">Delete</button>`;
+        }
+        html += `</div>`;
+      }
+      document.getElementById('chat-box').innerHTML += html;
+      // Auto scroll to the bottom
+      document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+    }
+
+    // Send message via WebSocket
+    function sendMessage() {
+      const message = document.getElementById('message').value;
+      if (!message || !currentChannel || !ws || ws.readyState !== WebSocket.OPEN) return;
+      const payload = {
+        token: token,
+        server_id: currentServer,
+        channel_id: currentChannel,
+        content: message,
+        is_action: document.getElementById('is-action-checkbox').checked
+      };
+      if (selectedAlternate) {
+        payload.alternate_id = selectedAlternate.id;
+      }
+      ws.send(JSON.stringify(payload));
+      document.getElementById('message').value = '';
+    }
+
+    // Function to edit a message (still using REST for edit/delete operations)
+    function editMessage(messageId, oldContent) {
+      const newContent = prompt("Edit your message:", oldContent);
+      if (newContent === null || newContent === oldContent) return;
+      fetch(apiBase + '/edit-message', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'  },
+        body: JSON.stringify({ message_id: messageId, new_content: newContent, user_id: currentUserId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        create_alert(data.message);
+      });
+    }
+
+    // Function to delete a message (still using REST)
+    function deleteMessage(messageId) {
+      if (!confirm("Are you sure you want to delete this message?")) return;
+      fetch(apiBase + '/delete-message', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({ message_id: messageId, user_id: currentUserId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        create_alert(data.message);
+      });
+    }
+
+    // Load online members from /users
+    function loadOnlineMembers() {
+      fetch(apiBase + '/users', {headers: { 'ngrok-skip-browser-warning': 'true' }})
+        .then(res => res.json())
+        .then(users => {
+          let html = '';
+          users.forEach(user => {
+            if (user.online) {
+              html += `<p>${user.display_name}</p>`;
+            }
+          });
+          document.getElementById('online-members').innerHTML = html;
+        });
+    }
+
+    // Update profile (username and display name)
+    function updateProfile() {
+      let newUsername = document.getElementById('update-username').value;
+      let newDisplayName = document.getElementById('update-display-name').value;
+      if (!newUsername && !newDisplayName) {
+        create_alert('Enter a new username or display name.');
+        return;
+      }
+      fetch(apiBase + '/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({
+          token: token,
+          username: newUsername,
+          display_name: newDisplayName
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        create_alert(data.message);
+        if (newDisplayName) {
+          currentDisplayName = newDisplayName;
+          updateProfileInfo();
+        }
+      });
+    }
+
+    // Update profile icon using URL (no file upload)
+    function updateProfileIcon() {
+      const iconUrl = document.getElementById('profile-icon-url').value;
+      if (!iconUrl) {
+        create_alert('Enter a valid icon URL.');
+        return;
+      }
+      fetch(apiBase + '/upload-profile-picture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({
+          image_url: iconUrl,
+          token: token
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        create_alert(data.message);
+      });
+      currentProfilePicture = iconUrl;
+      updateProfileInfo();
+    }
+
+    // Load alternates for the current user and populate the global array and selector
+    function loadAlternates() {
+      fetch(apiBase + '/users', {headers: { 'ngrok-skip-browser-warning': 'true' }})
+        .then(res => res.json())
+        .then(users => {
+          let currentUser = users.find(u => u.id === currentUserId);
+          if (currentUser && currentUser.alternates) {
+            currentAlternates = currentUser.alternates;
+          } else {
+            currentAlternates = [];
+          }
+          renderAlternatesList();
+          loadAlternateSelector();
+        });
+    }
+
+    // Render alternates in the sidebar
+    function renderAlternatesList() {
+      let html = '';
+      currentAlternates.forEach(alt => {
+        html += `<div class="alternate-item" onclick="selectAlternate('${alt.id}')">
+                   <span>${alt.name}</span>
+                   <button onclick="event.stopPropagation(); deleteAlternate(${alt.id})">Delete</button>
+                 </div>`;
+      });
+      document.getElementById('alternates-list').innerHTML = html;
+    }
+
+    // Populate the alternate selection dropdown
+    function loadAlternateSelector() {
+      let selector = document.getElementById('alternate-selector');
+      selector.innerHTML = `<option value="">Default (${currentDisplayName})</option>`;
+      currentAlternates.forEach(alt => {
+        selector.innerHTML += `<option value="${alt.id}">${alt.name}</option>`;
+      });
+    }
+
+    // Set selected alternate from the dropdown
+    function selectAlternate(altId) {
+      if (altId === "") {
+        selectedAlternate = null;
+      } else {
+        selectedAlternate = currentAlternates.find(alt => alt.id == altId);
+      }
+    }
+
+    // Create an alternate (max 20 per user)
+    function createAlternate() {
+      let name = document.getElementById('new-alternate-name').value;
+      let icon = document.getElementById('new-alternate-icon').value;
+      let user_id = currentUserId;
+      if (!name) {
+        create_alert('Enter an alternate name.');
+        return;
+      }
+      fetch(apiBase + '/create-alternate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'  },
+        body: JSON.stringify({ user_id, name, icon })
+      })
+      .then(res => res.json())
+      .then(data => {
+        create_alert(data.message);
+        loadAlternates();
+      });
+    }
+
+    // Delete an alternate by ID
+    function deleteAlternate(alternateId) {
+      fetch(apiBase + '/delete-alternate?alternate_id=' + alternateId, {
+        method: 'DELETE',
+        headers: { 'ngrok-skip-browser-warning': 'true' }
+      })
+      .then(res => res.json())
+      .then(data => {
+        create_alert(data.message);
+        loadAlternates();
+      });
+    }
+  </script>
+</body>
+</html>
